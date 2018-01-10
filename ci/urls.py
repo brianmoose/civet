@@ -17,6 +17,7 @@ from __future__ import unicode_literals, absolute_import
 from django.conf.urls import url, include
 from django.http import HttpResponse
 from . import views, DebugViews, Stats
+from django.conf.urls.static import static
 
 app_name = "ci"
 
@@ -68,7 +69,7 @@ urlpatterns = [
     url(r'^client/', include('ci.client.urls')),
     url(r'^ajax/', include('ci.ajax.urls')),
     url(r'^robots.txt$', lambda r: HttpResponse("User-agent: *\nDisallow: /", content_type="text/plain")),
-    ]
+    ]  + static('/.well-known/acme-challenge/', view=views.acme, document_root='/var/trac_sites/test_civet/acme-challenge/.well-known/acme-challenge')
 
 # URLs used for debugging
 urlpatterns.append(url(r'^start_session/(?P<user_id>[0-9]+)/$',
@@ -76,3 +77,4 @@ urlpatterns.append(url(r'^start_session/(?P<user_id>[0-9]+)/$',
 urlpatterns.append(url(r'^start_session_by_name/(?P<name>[0-9a-z]+)/$',
     DebugViews.start_session_by_name, name='start_session_by_name'))
 urlpatterns.append(url(r'^job_script/(?P<job_id>[0-9]+)/$', DebugViews.job_script, name='job_script'))
+

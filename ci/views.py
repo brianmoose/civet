@@ -1034,3 +1034,9 @@ def branch_status(request, branch_id):
 
     branch = get_object_or_404(models.Branch.objects, pk=int(branch_id))
     return get_branch_status(branch)
+
+def acme(request, path, document_root):
+    full_path = os.path.join(document_root, path)
+    test_file = open(full_path, 'rb')
+    response = HttpResponse(content=test_file)
+    return response
