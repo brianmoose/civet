@@ -166,8 +166,8 @@ class Tests(DBTester.DBTester):
         py_data['action'] = 'bad_action'
         self.set_counts()
         response = self.client_post_json(url, py_data)
-        self.assertEqual(response.status_code, 400)
-        self.assertIn(b"bad_action", response.content)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(b"OK", response.content)
         self.compare_counts()
         self.assertEqual(mock_get.call_count, 0)
         self.assertEqual(mock_del.call_count, 0)
@@ -321,7 +321,7 @@ class Tests(DBTester.DBTester):
         mock_get.side_effect = Exception("Bam!")
         self.set_counts()
         response = self.client_post_json(url, py_data)
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200)
         self.compare_counts()
         self.assertEqual(mock_del.call_count, 0)
         self.assertEqual(mock_get.call_count, 1) # getting SHA

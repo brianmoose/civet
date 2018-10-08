@@ -48,8 +48,8 @@ def cancel_event(ev, message, update_remote=False, do_pr_status_update=True):
 
     if update_remote:
         for job in cancelled_jobs:
-            UpdateRemoteStatus.job_complete_pr_status(job, do_pr_status_update)
-        UpdateRemoteStatus.event_complete(ev)
+            models.Task.create_no_fail(UpdateRemoteStatus.job_complete_pr_status, job.pk, do_pr_status_update)
+        models.Task.create_no_fail(UpdateRemoteStatus.event_complete, ev.pk)
 
 def get_active_labels(repo, changed_files):
     patterns = repo.get_repo_setting("recipe_label_activation", {})

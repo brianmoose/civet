@@ -166,7 +166,10 @@ class GitAPI(object):
             timeout = self._timeout(timeout)
             params = self._params(params, True)
             response = self._session.get(url,
-                    params=params, timeout=timeout, headers=self._headers, verify=self._ssl_cert)
+                    params=params,
+                    timeout=timeout,
+                    headers=self._headers,
+                    verify=self._ssl_cert)
         except Exception as e:
             return self._response_exception(url, "GET", e, params=params)
 
@@ -288,7 +291,9 @@ class GitAPI(object):
         try:
             while 'next' in response.links:
                 response = self.get(response.links["next"]["url"],
-                        params=params, timeout=timeout, log=log)
+                        params=params,
+                        timeout=timeout,
+                        log=log)
                 if not self._bad_response and response:
                     all_json.extend(response.json())
                 else:

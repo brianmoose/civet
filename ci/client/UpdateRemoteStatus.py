@@ -40,11 +40,12 @@ def add_comment(git_api, user, job):
     comment += '\nView the results [here]({}).\n'.format(job_url)
     git_api.pr_comment(job.event.comments_url, comment)
 
-def job_started(job):
+def job_started(job_id):
     """
     Indicates that the job as started.
     This will update the CI status on the Git server.
     """
+    job = models.Job.objects.get(pk=job_id)
     if job.event.cause == models.Event.PULL_REQUEST:
         git_api = job.event.build_user.api()
         git_api.update_pr_status(
@@ -57,11 +58,13 @@ def job_started(job):
             git_api.STATUS_JOB_STARTED,
             )
 
-def step_start_pr_status(step_result, job):
+def step_start_pr_status(step_result_id):
     """
     This gets called when the client starts a step.
     Just tries to update the status on the server.
     """
+    step_result = models.StepResult.objects.get(pk=step_result_id)
+    job = step_result.job
 
     if job.event.cause != models.Event.PULL_REQUEST:
         return
@@ -83,12 +86,13 @@ def step_start_pr_status(step_result, job):
         job_stage,
         )
 
-def job_complete_pr_status(job, do_status_update=True):
+def job_complete_pr_status(job_id, do_status_update=True):
     """
     Indicates that the job has completed.
     This will update the CI status on the Git server and
     try to add a comment.
     """
+    job = models.Job.objects.get(pk=job_id)
     if job.event.cause == models.Event.PULL_REQUEST:
         git_api = job.event.build_user.api()
         if do_status_update:
@@ -199,7 +203,7 @@ def create_event_summary(event):
     git_api = event.build_user.api()
     ProcessCommands.edit_comment(git_api, event.build_user, event.comments_url, msg, msg_re)
 
-def event_complete(event):
+def event_complete(event_id):
     """
     The event is complete (all jobs have finished).
     Check to see if there are "Failed but allowed"
@@ -207,6 +211,7 @@ def event_complete(event):
     (ie GitHub would just show a green checkmark).
     If there are add an appropiate label.
     """
+    event = models.Event.objects.get(pk=event_id)
     if event.cause != models.Event.PULL_REQUEST or not event.complete:
         return
 
@@ -282,13 +287,14 @@ def uncancel_previous_event(ev, msg):
             prev_ev.save()
             prev_ev.make_jobs_ready()
 
-def job_complete(job):
+def job_complete(job_id):
     """
     Should be called whenever a job is completed.
     This will update the Git server status and make
     any additional jobs ready.
     """
-    job_complete_pr_status(job)
+    job = models.Job.objects.get(pk=job_id)
+    job_complete_pr_status(job_id)
     create_issue_on_fail(job)
     start_canceled_on_fail(job)
 
@@ -299,7 +305,7 @@ def job_complete(job):
     all_done = job.event.set_complete_if_done()
 
     if all_done:
-        event_complete(job.event)
+        event_complete(job.event.pk)
         unrunnable = job.event.get_unrunnable_jobs()
         for norun in unrunnable:
             logger.info("Job %s: %s will not run due to failed dependencies" % (norun.pk, norun))

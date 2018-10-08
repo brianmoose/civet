@@ -17,13 +17,13 @@ from __future__ import unicode_literals, absolute_import
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotAllowed
 import logging, traceback
-from ci.github.api import GitException
 from ci import models, PushEvent, PullRequestEvent, GitCommitData, ReleaseEvent
 import json
 
 logger = logging.getLogger('ci')
 
-def process_push(user, data):
+def process_push(user_id, data):
+    user = models.GitUser.objects.get(pk=user_id)
     push_event = PushEvent.PushEvent()
     push_event.build_user = user
     push_event.user = data['sender']['login']
@@ -59,7 +59,8 @@ def process_push(user, data):
     push_event.full_text = data
     push_event.save()
 
-def process_pull_request(user, data):
+def process_pull_request(user_id, data):
+    user = models.GitUser.objects.get(pk=user_id)
     pr_event = PullRequestEvent.PullRequestEvent()
     pr_data = data['pull_request']
 
@@ -68,19 +69,28 @@ def process_pull_request(user, data):
     pr_event.pr_number = int(data['number'])
 
     state = pr_data['state']
+    ignore_actions = ['labeled',
+            'unlabeled',
+            'assigned',
+            'unassigned',
+            'review_requested',
+            'review_request_removed',
+            'edited',
+            ]
     if action == 'opened' or action == 'synchronize' or (action == "edited" and state == "open"):
         pr_event.action = PullRequestEvent.PullRequestEvent.OPENED
     elif action == 'closed':
         pr_event.action = PullRequestEvent.PullRequestEvent.CLOSED
     elif action == 'reopened':
         pr_event.action = PullRequestEvent.PullRequestEvent.REOPENED
-    elif action in ['labeled', 'unlabeled', 'assigned', 'unassigned', 'review_requested', 'review_request_removed', 'edited']:
+    elif action in ignore_actions:
         # actions that we don't support. "edited" is not supported if the PR is closed.
-        logger.info('Ignoring github action "{}" on PR: #{}: {}'.format(action, data['number'], pr_data['title']))
+        logger.info('Ignoring github action "{}" on PR: #{}: {}'.format(
+            action, data['number'], pr_data['title']))
         return None
     else:
-        raise GitException("Pull request %s contained unknown action: %s" % (pr_event.pr_number, action))
-
+        logger.warning("Pull request %s contained unknown action: %s" % (pr_event.pr_number, action))
+        return None
 
     pr_event.trigger_user = pr_data['user']['login']
     pr_event.build_user = user
@@ -119,7 +129,9 @@ def process_pull_request(user, data):
     gapi = user.api()
     if action == 'synchronize':
         # synchronize is used when updating due to a new push in the branch that the PR is tracking
-        gapi._remove_pr_todo_labels(pr_event.base_commit.owner, pr_event.base_commit.repo, pr_event.pr_number)
+        gapi._remove_pr_todo_labels(pr_event.base_commit.owner,
+                pr_event.base_commit.repo,
+                pr_event.pr_number)
 
     pr_event.full_text = data
     pr_event.changed_files = gapi._get_pr_changed_files(
@@ -129,12 +141,13 @@ def process_pull_request(user, data):
             )
     pr_event.save()
 
-def process_release(user, data):
+def process_release(user_id, data):
     """
     Called on the "release" webhook when a user does a GitHub release.
     A GitHub release is basically just a tag along with some other niceties like
     auto tarballing the source code for the tag.
     """
+    user = models.GitUser.objects.get(pk=user_id)
     rel_event = ReleaseEvent.ReleaseEvent()
     rel_event.build_user = user
     release = data['release']
@@ -147,7 +160,8 @@ def process_release(user, data):
     owner = repo_data['owner']['login']
 
     if len(branch) == 40:
-        # We have an actual SHA but the branch information is not anywhere so we just assume the commit was on master
+        # We have an actual SHA but the branch information is not anywhere so we
+        # just assume the commit was on master
         tag_sha = branch
         branch = "master"
     else:
@@ -155,9 +169,11 @@ def process_release(user, data):
         api = user.api()
         tag_sha = api._tag_sha(owner, repo_name, rel_event.release_tag)
         if tag_sha is None:
-            raise GitException("Couldn't find SHA for %s/%s:%s." % (owner, repo_name, rel_event.release_tag))
+            logger.warning("Couldn't find SHA for %s/%s:%s." % (owner, repo_name, rel_event.release_tag))
+            return None
 
-    logger.info("Release '%s' on %s/%s:%s using commit %s" % (rel_event.release_tag, owner, repo_name, branch, tag_sha))
+    logger.info("Release '%s' on %s/%s:%s using commit %s" % (
+        rel_event.release_tag, owner, repo_name, branch, tag_sha))
 
     rel_event.commit = GitCommitData.GitCommitData(
         owner,
@@ -199,11 +215,11 @@ def process_event(user, json_data):
         logger.info('Webhook called:\n{}'.format(json.dumps(json_data, indent=2)))
 
         if 'pull_request' in json_data:
-            process_pull_request(user, json_data)
+            models.Task.create_no_fail(process_pull_request, user.pk, json_data)
         elif 'commits' in json_data:
-            process_push(user, json_data)
+            models.Task.create_no_fail(process_push, user.pk, json_data)
         elif 'release' in json_data:
-            process_release(user, json_data)
+            models.Task.create_no_fail(process_release, user.pk, json_data)
         elif 'zen' in json_data:
             # this is a ping that gets called when first
             # installing a hook. Just log it and move on.

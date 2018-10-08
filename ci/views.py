@@ -33,7 +33,6 @@ from django.utils.html import escape
 from django.views.decorators.cache import never_cache
 from ci.client import UpdateRemoteStatus
 import os, re
-
 import logging, traceback
 logger = logging.getLogger('ci')
 
@@ -897,7 +896,7 @@ def cancel_job(request, job_id):
     if comment:
         message += "\nwith comment: %s" % comment
     set_job_canceled(job, message)
-    UpdateRemoteStatus.job_complete(job)
+    models.Task.create_no_fail(UpdateRemoteStatus.job_complete, job.pk)
     logger.info('Job {}: {} on {} canceled by {}'.format(job.pk, job, job.recipe.repository, signed_in_user))
     messages.info(request, 'Job {} canceled'.format(job))
     return redirect('ci:view_job', job_id=job.pk)

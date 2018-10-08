@@ -24,6 +24,9 @@ import json
 from requests_oauthlib import OAuth2Session
 from datetime import timedelta
 
+def func_no_fail():
+    print("In func_no_fail")
+
 @override_settings(INSTALLED_GITSERVERS=[utils.github_config()])
 class Tests(DBTester.DBTester):
     def setUp(self):
@@ -374,3 +377,24 @@ class Tests(DBTester.DBTester):
             self.set_counts()
             management.call_command("sync_badges", stdout=out)
             self.compare_counts(badges=-1)
+
+    def test_process_tasks(self):
+        out = StringIO()
+        # settings.USE_TASK_QUEUE is off by default.
+        # Which runs the task immediately
+        self.set_counts()
+        models.Task.create_no_fail(func_no_fail)
+        management.call_command("process_tasks", "--dryrun", stdout=out)
+        self.compare_counts()
+
+        with self.settings(USE_TASK_QUEUE=True):
+            self.set_counts()
+            models.Task.create_no_fail(func_no_fail)
+            management.call_command("process_tasks", "--dryrun", stdout=out)
+            self.compare_counts(num_tasks=1)
+
+            self.set_counts()
+            management.call_command("process_tasks", "--clear-stop", stdout=out)
+            management.call_command("process_tasks", "--one-task", stdout=out)
+            print(out.getvalue())
+            self.compare_counts()

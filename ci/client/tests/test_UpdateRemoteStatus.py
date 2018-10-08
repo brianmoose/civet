@@ -39,14 +39,14 @@ class Tests(ClientTester.ClientTester):
 
         with self.settings(INSTALLED_GITSERVERS=[utils.github_config(remote_update=True)]):
             # Wrong cause
-            UpdateRemoteStatus.step_start_pr_status(results, job)
+            UpdateRemoteStatus.step_start_pr_status(results.pk)
             self.assertEqual(mock_post.call_count, 0)
 
             job.event.cause = models.Event.PULL_REQUEST
             job.event.save()
 
             # OK
-            UpdateRemoteStatus.step_start_pr_status(results, job)
+            UpdateRemoteStatus.step_start_pr_status(results.pk)
             self.assertEqual(mock_post.call_count, 1)
 
     @patch.object(OAuth2Session, 'post')
@@ -128,7 +128,7 @@ class Tests(ClientTester.ClientTester):
         git_config = utils.github_config(post_event_summary=False, failed_but_allowed_label_name=None, remote_update=True)
         with self.settings(INSTALLED_GITSERVERS=[git_config]):
             # Not complete, shouldn't do anything
-            UpdateRemoteStatus.event_complete(ev)
+            UpdateRemoteStatus.event_complete(ev.pk)
             self.assertEqual(mock_get.call_count, 0)
             self.assertEqual(mock_post.call_count, 0)
             self.assertEqual(mock_del.call_count, 0)
@@ -137,7 +137,7 @@ class Tests(ClientTester.ClientTester):
             ev.save()
 
             # event isn't a pull request, so we shouldn't do anything
-            UpdateRemoteStatus.event_complete(ev)
+            UpdateRemoteStatus.event_complete(ev.pk)
             self.assertEqual(mock_get.call_count, 0)
             self.assertEqual(mock_post.call_count, 0)
             self.assertEqual(mock_del.call_count, 0)
@@ -148,7 +148,7 @@ class Tests(ClientTester.ClientTester):
             ev.save()
 
             # No label so we shouldn't do anything
-            UpdateRemoteStatus.event_complete(ev)
+            UpdateRemoteStatus.event_complete(ev.pk)
             self.assertEqual(mock_get.call_count, 0)
             self.assertEqual(mock_post.call_count, 0)
             self.assertEqual(mock_del.call_count, 0)
@@ -157,7 +157,7 @@ class Tests(ClientTester.ClientTester):
         with self.settings(INSTALLED_GITSERVERS=[git_config]):
             # event is SUCCESS, so we shouldn't add a label but
             # we will try to remove an existing label
-            UpdateRemoteStatus.event_complete(ev)
+            UpdateRemoteStatus.event_complete(ev.pk)
             self.assertEqual(mock_get.call_count, 0)
             self.assertEqual(mock_post.call_count, 0)
             self.assertEqual(mock_del.call_count, 1) # removing the label
@@ -166,7 +166,7 @@ class Tests(ClientTester.ClientTester):
             ev.save()
 
             # Don't put anything if the event is FAILED
-            UpdateRemoteStatus.event_complete(ev)
+            UpdateRemoteStatus.event_complete(ev.pk)
             self.assertEqual(mock_get.call_count, 0)
             self.assertEqual(mock_post.call_count, 0)
             self.assertEqual(mock_del.call_count, 2)
@@ -175,7 +175,7 @@ class Tests(ClientTester.ClientTester):
             ev.save()
 
             # should try to add a label
-            UpdateRemoteStatus.event_complete(ev)
+            UpdateRemoteStatus.event_complete(ev.pk)
             self.assertEqual(mock_get.call_count, 0)
             self.assertEqual(mock_post.call_count, 1) # add the label
             self.assertEqual(mock_del.call_count, 2)

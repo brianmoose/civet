@@ -22,10 +22,8 @@ import json
 
 logger = logging.getLogger('ci')
 
-class BitBucketException(Exception):
-    pass
-
-def process_push(user, data):
+def process_push(user_id, data):
+    user = models.GitUser.objects.get(pk=user_id)
     push_event = PushEvent.PushEvent()
     push_event.build_user = user
 
@@ -35,9 +33,11 @@ def process_push(user, data):
     new_data = push_data['changes'][-1].get('new')
     old_data = push_data['changes'][-1].get('old')
     if not old_data:
-        raise BitBucketException("Push event doesn't have old data!")
+        logger.error("Push event doesn't have old data!")
+        return
     if not new_data:
-        raise BitBucketException("Push event doesn't have new data!")
+        logger.error("Push event doesn't have new data!")
+        return
     ref = new_data['name']
     owner = repo_data['owner']['username']
     ssh_url = 'git@bitbucket.org:{}/{}.git'.format(owner, repo_data['name'])
@@ -64,7 +64,8 @@ def process_push(user, data):
     push_event.full_text = data
     push_event.save()
 
-def process_pull_request(user, data):
+def process_pull_request(user_id, data):
+    user = models.GitUser.objects.get(pk=user_id)
     pr_event = PullRequestEvent.PullRequestEvent()
     pr_data = data['pullrequest']
 
@@ -77,7 +78,8 @@ def process_pull_request(user, data):
     elif action == 'MERGED' or action == 'DECLINED':
         pr_event.action = PullRequestEvent.PullRequestEvent.CLOSED
     else:
-        raise BitBucketException("Pull request #%s contained unknown action." % pr_event.pr_number)
+        logger.warning("Pull request #%s contained unknown action: %s" % (pr_event.pr_number, action))
+        return
 
     api = user.api()
     pr_event.build_user = user
@@ -144,9 +146,9 @@ def process_event(user, json_data):
     try:
         logger.info('Webhook called:\n{}'.format(json.dumps(json_data, indent=2)))
         if 'pullrequest' in json_data:
-            process_pull_request(user, json_data)
+            models.Task.create_no_fail(process_pull_request, user.pk, json_data)
         elif 'push' in json_data:
-            process_push(user, json_data)
+            models.Task.create_no_fail(process_push, user.pk, json_data)
         else:
             err_str = 'Unknown post to bitbucket hook'
             logger.warning(err_str)

@@ -32,6 +32,7 @@ import json
 import ansi2html
 import logging
 from django.db.models import Sum
+import importlib
 logger = logging.getLogger('ci')
 
 class DBException(Exception):
@@ -46,7 +47,8 @@ class JobStatus(object):
     CANCELED = 5
     ACTIVATION_REQUIRED = 6
 
-    STATUS_CHOICES = ((NOT_STARTED, "Not started"),
+    STATUS_CHOICES = (
+        (NOT_STARTED, "Not started"),
         (SUCCESS, "Passed"),
         (RUNNING, "Running"),
         (FAILED, "Failed"),
@@ -1191,3 +1193,62 @@ class RepositoryBadge(models.Model):
     def __str__(self):
         return "%s:%s" % (self.repository, self.name)
 
+@python_2_unicode_compatible
+class Task(models.Model):
+    no_fail = models.BooleanField(default=False)
+    function_data = models.TextField()
+    count = models.PositiveSmallIntegerField(default=0)
+    failed = models.BooleanField(default=False)
+    complete = models.BooleanField(default=False)
+    created = models.DateTimeField(auto_now_add=True)
+    last_modified = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return "%s" % self.function_data
+
+    def run(self):
+        self.failed = self._run(self.function_data, self.pk)
+        self.count += 1
+        if not self.no_fail or (self.no_fail and not self.failed):
+            self.complete = True
+        self.save()
+        return self.complete
+
+    @classmethod
+    def _run(cls, data, pk=-1):
+        fd = json.loads(data)
+        mod = importlib.import_module(fd["module"])
+        func = getattr(mod, fd["function"])
+        try:
+            func(*fd["args"])
+            return True
+        except Exception as e:
+            logger.info('Task %s failed:\n%s\nException:%s' % (pk, json.dumps(fd, indent=2), e))
+            return False
+
+    @classmethod
+    def _new_record(cls, no_fail, function, *args):
+        function_data = json.dumps({"module": function.__module__,
+            "function": function.__name__,
+            "args": args})
+
+        if settings.USE_TASK_QUEUE:
+            cls.objects.create(no_fail=no_fail, function_data=function_data)
+        else:
+            cls._run(function_data)
+
+    @classmethod
+    def create_fail_ok(cls, function, *args):
+        cls._new_record(True, function, *args)
+
+    @classmethod
+    def create_no_fail(cls, function, *args):
+        cls._new_record(False, function, *args)
+
+    @classmethod
+    def next_task(cls):
+        return cls.available_tasks().first()
+
+    @classmethod
+    def available_tasks(cls):
+        return cls.objects.filter(complete=False).order_by("created")

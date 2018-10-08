@@ -93,8 +93,8 @@ class Tests(DBTester.DBTester):
         py_data['pullrequest']['state'] = 'BadState'
         self.set_counts()
         response = self.client_post_json(url, py_data)
-        self.assertEqual(response.status_code, 400)
-        self.assertNotEqual(response.content, b"OK")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"OK")
         self.compare_counts(pr_closed=True)
 
     def test_push(self):
@@ -127,14 +127,14 @@ class Tests(DBTester.DBTester):
         del py_data['push']['changes'][-1]['new']
         self.set_counts()
         response = self.client_post_json(url, py_data)
-        self.assertEqual(response.status_code, 400)
-        self.assertNotEqual(response.content, b"OK")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"OK")
         self.compare_counts()
 
         # Sometimes the old data isn't there
         del py_data['push']['changes'][-1]['old']
         self.set_counts()
         response = self.client_post_json(url, py_data)
-        self.assertEqual(response.status_code, 400)
-        self.assertNotEqual(response.content, b"OK")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"OK")
         self.compare_counts()

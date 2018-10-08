@@ -81,13 +81,15 @@ class DBCompare(object):
         self.num_repos = models.Repository.objects.count()
         self.num_active_repos = models.Repository.objects.filter(active=True).count()
         self.num_branches = models.Branch.objects.count()
-        self.num_active_branches = models.Branch.objects.exclude(status=models.JobStatus.NOT_STARTED).count()
+        self.num_active_branches = models.Branch.objects.exclude(
+                status=models.JobStatus.NOT_STARTED).count()
         self.num_commits = models.Commit.objects.count()
         self.num_prs = models.PullRequest.objects.count()
         self.num_push_recipes = models.Recipe.objects.filter(cause=models.Recipe.CAUSE_PUSH).count()
         self.num_pr_recipes = models.Recipe.objects.filter(cause=models.Recipe.CAUSE_PULL_REQUEST).count()
         self.num_manual_recipes = models.Recipe.objects.filter(cause=models.Recipe.CAUSE_MANUAL).count()
-        self.num_pr_alt_recipes = models.Recipe.objects.filter(cause=models.Recipe.CAUSE_PULL_REQUEST_ALT).count()
+        self.num_pr_alt_recipes = models.Recipe.objects.filter(
+                cause=models.Recipe.CAUSE_PULL_REQUEST_ALT).count()
         self.num_release_recipes = models.Recipe.objects.filter(cause=models.Recipe.CAUSE_RELEASE).count()
         self.num_canceled = models.Job.objects.filter(status=models.JobStatus.CANCELED).count()
         self.num_events_canceled = models.Event.objects.filter(status=models.JobStatus.CANCELED).count()
@@ -104,6 +106,7 @@ class DBCompare(object):
         self.num_jobs_completed = models.Job.objects.filter(complete=True).count()
         self.num_viewable_teams = models.RecipeViewableByTeam.objects.count()
         self.num_badges = models.RepositoryBadge.objects.count()
+        self.num_tasks = models.Task.objects.count()
 
     def compare_counts(self, jobs=0, ready=0, events=0, recipes=0, deps=0, pr_closed=False,
         current=0, sha_changed=False, users=0, repos=0, branches=0, commits=0,
@@ -113,7 +116,7 @@ class DBCompare(object):
         num_pr_alts=0, active_repos=0, active_branches=0, repo_prefs=0,
         num_clients=0, events_canceled=0, num_changelog=0,
         num_jobs_completed=0, num_events_completed=0,
-        num_release_recipes=0, badges=0,
+        num_release_recipes=0, badges=0, num_tasks=0,
         viewable_teams=0):
         self.assertEqual(self.num_jobs + jobs, models.Job.objects.count())
         self.assertEqual(self.num_jobs_ready + ready, models.Job.objects.filter(ready=True).count())
@@ -124,19 +127,29 @@ class DBCompare(object):
         self.assertEqual(self.num_current + current, models.Recipe.objects.filter(current=True).count())
         self.assertEqual(self.num_users + users, models.GitUser.objects.count())
         self.assertEqual(self.num_repos + repos, models.Repository.objects.count())
-        self.assertEqual(self.num_active_repos + active_repos, models.Repository.objects.filter(active=True).count())
+        self.assertEqual(self.num_active_repos + active_repos,
+                models.Repository.objects.filter(active=True).count())
         self.assertEqual(self.num_branches + branches, models.Branch.objects.count())
-        self.assertEqual(self.num_active_branches + active_branches, models.Branch.objects.exclude(status=models.JobStatus.NOT_STARTED).count())
+        self.assertEqual(self.num_active_branches + active_branches,
+                models.Branch.objects.exclude(status=models.JobStatus.NOT_STARTED).count())
         self.assertEqual(self.num_commits + commits, models.Commit.objects.count())
         self.assertEqual(self.num_prs + prs, models.PullRequest.objects.count())
-        self.assertEqual(self.num_push_recipes + num_push_recipes, models.Recipe.objects.filter(cause=models.Recipe.CAUSE_PUSH).count())
-        self.assertEqual(self.num_pr_recipes + num_pr_recipes, models.Recipe.objects.filter(cause=models.Recipe.CAUSE_PULL_REQUEST).count())
-        self.assertEqual(self.num_manual_recipes + num_manual_recipes, models.Recipe.objects.filter(cause=models.Recipe.CAUSE_MANUAL).count())
-        self.assertEqual(self.num_pr_alt_recipes + num_pr_alt_recipes,  models.Recipe.objects.filter(cause=models.Recipe.CAUSE_PULL_REQUEST_ALT).count())
-        self.assertEqual(self.num_release_recipes + num_release_recipes,  models.Recipe.objects.filter(cause=models.Recipe.CAUSE_RELEASE).count())
-        self.assertEqual(self.num_canceled + canceled, models.Job.objects.filter(status=models.JobStatus.CANCELED).count())
-        self.assertEqual(self.num_events_canceled + events_canceled, models.Event.objects.filter(status=models.JobStatus.CANCELED).count())
-        self.assertEqual(self.num_invalidated + invalidated, models.Job.objects.filter(invalidated=True).count())
+        self.assertEqual(self.num_push_recipes + num_push_recipes,
+                models.Recipe.objects.filter(cause=models.Recipe.CAUSE_PUSH).count())
+        self.assertEqual(self.num_pr_recipes + num_pr_recipes,
+                models.Recipe.objects.filter(cause=models.Recipe.CAUSE_PULL_REQUEST).count())
+        self.assertEqual(self.num_manual_recipes + num_manual_recipes,
+                models.Recipe.objects.filter(cause=models.Recipe.CAUSE_MANUAL).count())
+        self.assertEqual(self.num_pr_alt_recipes + num_pr_alt_recipes,
+                models.Recipe.objects.filter(cause=models.Recipe.CAUSE_PULL_REQUEST_ALT).count())
+        self.assertEqual(self.num_release_recipes + num_release_recipes,
+                models.Recipe.objects.filter(cause=models.Recipe.CAUSE_RELEASE).count())
+        self.assertEqual(self.num_canceled + canceled,
+                models.Job.objects.filter(status=models.JobStatus.CANCELED).count())
+        self.assertEqual(self.num_events_canceled + events_canceled,
+                models.Event.objects.filter(status=models.JobStatus.CANCELED).count())
+        self.assertEqual(self.num_invalidated + invalidated,
+                models.Job.objects.filter(invalidated=True).count())
         self.assertEqual(self.num_steps + num_steps, models.Step.objects.count())
         self.assertEqual(self.num_step_envs + num_step_envs, models.StepEnvironment.objects.count())
         self.assertEqual(self.num_recipe_envs + num_recipe_envs, models.RecipeEnvironment.objects.count())
@@ -145,10 +158,14 @@ class DBCompare(object):
         self.assertEqual(self.num_repo_prefs_count+ repo_prefs, self.repo_prefs_count())
         self.assertEqual(self.num_clients + num_clients, models.Client.objects.count())
         self.assertEqual(self.num_changelog + num_changelog, models.JobChangeLog.objects.count())
-        self.assertEqual(self.num_events_completed + num_events_completed, models.Event.objects.filter(complete=True).count())
-        self.assertEqual(self.num_jobs_completed + num_jobs_completed, models.Job.objects.filter(complete=True).count())
-        self.assertEqual(self.num_viewable_teams + viewable_teams, models.RecipeViewableByTeam.objects.count())
+        self.assertEqual(self.num_events_completed + num_events_completed,
+                models.Event.objects.filter(complete=True).count())
+        self.assertEqual(self.num_jobs_completed + num_jobs_completed,
+                models.Job.objects.filter(complete=True).count())
+        self.assertEqual(self.num_viewable_teams + viewable_teams,
+                models.RecipeViewableByTeam.objects.count())
         self.assertEqual(self.num_badges + badges, models.RepositoryBadge.objects.count())
+        self.assertEqual(self.num_tasks + num_tasks, models.Task.objects.count())
 
         if sha_changed:
             self.assertNotEqual(self.repo_sha, models.RecipeRepository.load().sha)

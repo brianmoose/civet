@@ -365,3 +365,5 @@ bitbucket_config = {"type": GITSERVER_BITBUCKET,
 
 # supported gitservers
 INSTALLED_GITSERVERS = [github_config]
+
+USE_TASK_QUEUE = False
